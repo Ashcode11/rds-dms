@@ -1,23 +1,26 @@
 # ============================================================
 # ENVIRONMENT: prod
-# Deploys Production RDS SQL Server 2022 (Multi-AZ primary)
-# + DMS Full Load + CDC instance
-# + AWS Backup with cross-region DR copy
-# Uses EXISTING VPC, subnets, and security groups.
+# Region:      us-west-2
+# AZs:         us-west-2a (primary) + us-west-2b (standby)
+# HA:          Multi-AZ ENABLED (synchronous standby in us-west-2b)
+# DR:          See environments/dr/ — cross-region backup replication to us-east-1
+# Instance:    db.r6i.16xlarge (64 vCPU / 512 GiB)
 # ============================================================
 
 locals {
   env = "prod"
   common_tags = {
-    Project     = "mssql-migration"
+    Project     = "GGA-MSSQL-Migration"
     Environment = local.env
-    ManagedBy   = "terraform"
+    ManagedBy   = "Terraform"
+    Owner       = "Nagarro"
     CostCenter  = "<COST_CENTER>"
   }
 }
 
 # ------------------------------------------------------------
 # Production RDS — 15 DBs / ~11.22 TB / Multi-AZ
+# Primary AZ: us-west-2a | Standby AZ: us-west-2b
 # db.r6i.16xlarge: 64 vCPU / 512 GiB RAM
 # ------------------------------------------------------------
 module "rds_prod" {
@@ -25,19 +28,23 @@ module "rds_prod" {
 
   identifier     = "gga-prod-mssql"
   instance_class = "db.r6i.16xlarge"
-  license_model  = "bring-your-own-license"
+  license_model  = "license-included"
 
   # Storage — 13 TB with autoscaling to 15 TB
   allocated_storage     = 13312   # 13 TB in GB
   max_allocated_storage = 15360   # 15 TB ceiling
-  iops                  = 0       # gp3 default 3000 IOPS; increase if needed
+  iops                  = 12000   # 12000 IOPS for production workload (gp3 max)
 
-  # Network — REPLACE with actual existing resource IDs
+  # Network — subnets in BOTH AZs required for Multi-AZ
+  # <PROD_SUBNET_ID_AZ_A> = subnet in us-west-2a (primary)
+  # <PROD_SUBNET_ID_AZ_B> = subnet in us-west-2b (standby)
   subnet_ids         = ["<PROD_SUBNET_ID_AZ_A>", "<PROD_SUBNET_ID_AZ_B>"]
   security_group_ids = ["<PROD_RDS_SG_ID>"]
 
-  # HA — Multi-AZ required for production
-  multi_az = true
+  # HA — Multi-AZ: primary in us-west-2a, synchronous standby in us-west-2b
+  # Automatic failover to standby if primary becomes unavailable (~60-120 sec RTO)
+  multi_az          = true
+  availability_zone = null   # AWS manages AZ placement for Multi-AZ
 
   # Auth
   db_username = "admin"

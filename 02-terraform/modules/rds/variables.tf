@@ -70,9 +70,17 @@ variable "security_group_ids" {
 
 # ---- HA ----
 variable "multi_az" {
-  description = "Enable Multi-AZ deployment. true = prod/INT-UAT | false = DEV/QA"
+  description = "Enable Multi-AZ deployment. true = prod/UAT | false = DEV/QA"
   type        = bool
   default     = false
+}
+
+variable "availability_zone" {
+  description = "Preferred AZ for single-AZ instances (e.g. us-west-2a). Ignored when multi_az = true."
+  type        = string
+  default     = null
+  # DEV / QA → "us-west-2a"
+  # UAT / Prod → null (Multi-AZ, AWS manages AZ selection)
 }
 
 # ---- Backup ----

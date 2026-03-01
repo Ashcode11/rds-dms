@@ -90,8 +90,11 @@ resource "aws_db_instance" "this" {
   publicly_accessible    = false
   port                   = 1433
 
+  # Single-AZ: set availability_zone; Multi-AZ: leave null (AWS selects AZs)
+  availability_zone = var.multi_az ? null : var.availability_zone
+
   # High Availability
-  multi_az = var.multi_az   # true for prod/INT-UAT, false for DEV/QA
+  multi_az = var.multi_az   # true for prod/UAT, false for DEV/QA
 
   # Parameter & Option Groups
   parameter_group_name = aws_db_parameter_group.this.name
